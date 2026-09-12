@@ -8,6 +8,11 @@
  * NOT production code. There is no authentication — the caller simply asserts a
  * user id — no persistence, and no rate limiting. Auth and storage belong to the
  * surrounding application, which is exactly why they are absent here.
+ *
+ * `/api/explain` (server/explain.ts) is the one endpoint that deserves a
+ * separate callout: it is strictly read-only and makes zero LLM calls, by
+ * construction — see that file's doc comment. It predicts what `/api/match`
+ * would do; it never joins, creates, or otherwise mutates the store.
  */
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -19,6 +24,7 @@ import {
   createInMemoryEventRepository,
   createInMemoryIdempotencyStore,
   createInMemoryMetrics,
+  createLocationService,
   llmCallRatio,
   semanticCacheHitRate,
   recommendationCacheHitRate,
@@ -31,6 +37,8 @@ import {
   type LlmClient,
   type MatchableEvent,
 } from '../src/index.js';
+import { explainIntent } from './explain.js';
+import { seedEvents } from './seed.js';
 
 const PORT = Number(process.env['PORT'] ?? 3000);
 const PUBLIC_DIR = join(dirname(fileURLToPath(import.meta.url)), 'public');
@@ -58,7 +66,24 @@ function buildLlmClient(): { llm: LlmClient | undefined; live: boolean } {
   return { llm: createAnthropicLlmClient({ taxonomy, apiKey }), live: true };
 }
 
-let repo = createInMemoryEventRepository();
+/**
+ * A second `LocationService` instance, independent of the one
+ * `createMatchingEngine` builds internally for itself (`MatchingEngine`
+ * exposes no getter for it). Both are built from the same immutable
+ * `CMU_LOCATIONS` data via the same pure, stateless factory, so there is no
+ * behavioural difference between them — this just gives `/api/explain`
+ * something to pass into `explainIntent`'s pinned signature.
+ */
+const locations = createLocationService(CMU_LOCATIONS);
+
+function freshRepo() {
+  // Re-anchored to wall-clock "now" every time: a repeated `/api/reset` (or a
+  // server restart) should always seed events relative to *that* moment, not
+  // whenever the process first booted.
+  return createInMemoryEventRepository({ seed: seedEvents(new Date()) });
+}
+
+let repo = freshRepo();
 let metrics = createInMemoryMetrics();
 const { llm, live: llmLive } = buildLlmClient();
 
@@ -73,7 +98,7 @@ function buildEngine() {
 let engine = buildEngine();
 
 function resetState(): void {
-  repo = createInMemoryEventRepository();
+  repo = freshRepo();
   metrics = createInMemoryMetrics();
   engine = buildEngine();
 }
@@ -191,6 +216,24 @@ const server = createServer((req, res) => {
           })),
           metrics: metricsPayload(),
         });
+      }
+
+      if (path === '/api/explain' && req.method === 'POST') {
+        const body = await readJsonBody(req);
+        const userId = typeof body['userId'] === 'string' ? body['userId'] : '';
+        if (userId === '') return send(400, { error: 'userId is required' });
+        const result = await explainIntent({
+          engine,
+          events: repo,
+          locations,
+          intent: toIntent(body),
+          userId,
+          now: new Date(),
+          // Demo-only: lets the inspector show which events the indexed query
+          // eliminated, and why. A production repository would not enumerate.
+          allEvents: repo.all(),
+        });
+        return send(200, { ...result, metrics: metricsPayload() });
       }
 
       if (path === '/api/match' && req.method === 'POST') {
