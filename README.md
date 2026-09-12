@@ -11,9 +11,20 @@ your database, your LLM, your cache, your profile store — is a port you inject
 
 ```bash
 npm install
+npm start         # demo web app on http://localhost:3000
 npm test          # 294 tests
-npm run example   # runnable end-to-end demo, no database or API key needed
+npm run example   # same flow in the terminal, no browser
 ```
+
+Nothing else is required — no database, no API key. `npm start` serves a page where
+you can click activity buttons, type free text, and watch the two paths behave
+differently in real time: the advisory panel updates on every change with a live
+score breakdown, while **Submit intent** is the only thing that joins or creates.
+The metrics panel shows LLM calls per match request as you go.
+
+Set `ANTHROPIC_API_KEY` before `npm start` to enable the semantic tier for genuinely
+novel free text. Without it the demo still works completely — the deterministic tier
+handles buttons, synonyms and known words, which is the whole point of the design.
 
 `npm run example` runs [`examples/quickstart.ts`](examples/quickstart.ts) and prints:
 
@@ -46,10 +57,27 @@ real database, implement [`EventRepository`](src/core/types.ts) — see
 [The production `EventRepository` contract](#the-production-eventrepository-contract)
 for the atomic conditional update and the indexes it needs.
 
-> **This is a library, not a service.** It ships no HTTP server, no routes and no UI —
-> deliberately, so it imposes no framework or deployment model on the app around it.
-> Cloning and running it gives you the test suite and the example above; to expose it
-> over HTTP, import it from your own server.
+> **The algorithm is a library, not a service.** Everything under [`src/`](src) ships no
+> HTTP server, no routes and no UI, deliberately, so it imposes no framework or
+> deployment model on the app around it.
+>
+> [`server/`](server) is a *demo consumer* of that library, not part of it — roughly 250
+> lines of Node's built-in `http`, zero dependencies, in-memory state. It exists so you
+> can see the algorithm work. **It has no authentication** (the caller simply asserts a
+> user id), no persistence and no rate limiting; auth and storage belong to the
+> surrounding application, which is exactly why they are absent. Do not deploy it as-is.
+
+### Demo endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/match` | Authoritative path — joins or creates |
+| `POST` | `/api/recommend` | Advisory path — read-only, zero LLM calls |
+| `GET`  | `/api/suggestions?userId=` | Deterministic personalized suggestions |
+| `GET`  | `/api/vocabulary` | Activities, categories, locations, synonyms |
+| `GET`  | `/api/events` | Current repository state (demo only) |
+| `GET`  | `/api/metrics` | Counters plus the LLM-calls-per-match ratio |
+| `POST` | `/api/reset` | Clear demo state |
 
 ---
 

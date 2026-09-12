@@ -20,6 +20,6 @@
     "verbatimModuleSyntax": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts", "examples/**/*.ts"],
+  "include": ["src/**/*.ts", "tests/**/*.ts", "examples/**/*.ts", "server/**/*.ts"],
   "exclude": ["dist", "node_modules"]
 }

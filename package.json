@@ -7,7 +7,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "example": "tsx examples/quickstart.ts"
+    "example": "tsx examples/quickstart.ts",
+    "start": "tsx server/index.ts"
   },
   "author": "",
   "license": "UNLICENSED",

@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FriendMatch — matching demo</title>
+<style>
+  :root {
+    --bg: #faf9f7; --panel: #fff; --ink: #1c1b19; --muted: #6b6862;
+    --line: #e5e2dc; --accent: #2f6f4e; --accent-soft: #e8f1ec;
+    --warn: #8a5a00; --warn-soft: #fdf3e0; --bad: #8a2f2f; --bad-soft: #fbeceb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17181a; --panel: #1f2124; --ink: #ececec; --muted: #9a9a98;
+      --line: #32353a; --accent: #6cc39a; --accent-soft: #1d2e26;
+      --warn: #e0b063; --warn-soft: #2e2617; --bad: #e08585; --bad-soft: #2e1d1d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 28px 20px 64px; }
+  header { margin-bottom: 22px; }
+  h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 13.5px; margin: 0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 16px 18px;
+  }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .07em;
+              color: var(--muted); margin: 0 0 4px; font-weight: 600; }
+  .panel .hint { color: var(--muted); font-size: 12.5px; margin: 0 0 12px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .chip {
+    border: 1px solid var(--line); background: transparent; color: var(--ink);
+    border-radius: 999px; padding: 5px 11px; font-size: 13px; cursor: pointer;
+    font-family: inherit; transition: background .12s, border-color .12s;
+  }
+  .chip:hover { border-color: var(--accent); }
+  .chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .cat { font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+         color: var(--muted); margin: 10px 0 5px; }
+  label { display: block; font-size: 12.5px; color: var(--muted); margin: 10px 0 4px; }
+  input, select {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px;
+    background: var(--bg); color: var(--ink); font: inherit; font-size: 14px;
+  }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+  .actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  button.go {
+    background: var(--accent); color: #fff; border: 0; border-radius: 7px;
+    padding: 9px 16px; font: inherit; font-weight: 600; font-size: 14px; cursor: pointer;
+  }
+  button.ghost {
+    background: transparent; color: var(--muted); border: 1px solid var(--line);
+    border-radius: 7px; padding: 9px 14px; font: inherit; font-size: 14px; cursor: pointer;
+  }
+  button.go:hover { filter: brightness(1.08); }
+  button.ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .rec { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .rec-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+  .rec-title { font-weight: 600; font-size: 14px; }
+  .score { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 14px; }
+  .rec-meta { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .bars { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 9px; }
+  .bar-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .bar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: 3px; }
+  .bar > i { display: block; height: 100%; background: var(--accent); }
+  .empty { color: var(--muted); font-size: 13.5px; font-style: italic; padding: 6px 0; }
+  .outcome { border-radius: 8px; padding: 11px 13px; margin-bottom: 10px; font-size: 14px; }
+  .outcome.matched { background: var(--accent-soft); border: 1px solid var(--accent); }
+  .outcome.pending { background: var(--warn-soft); border: 1px solid var(--warn); }
+  .outcome.rejected { background: var(--bad-soft); border: 1px solid var(--bad); }
+  .outcome b { font-size: 13px; letter-spacing: .04em; }
+  .outcome.matched b { color: var(--accent); }
+  .outcome.pending b { color: var(--warn); }
+  .outcome.rejected b { color: var(--bad); }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 10px; }
+  .metric { border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; }
+  .metric .v { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .metric .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-top: 1px; }
+  .metric.hero .v { color: var(--accent); }
+  .note { font-size: 12.5px; color: var(--muted); margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  code { background: var(--bg); border: 1px solid var(--line); border-radius: 4px;
+         padding: 1px 5px; font-size: 12.5px; }
+  .ev { font-size: 13px; padding: 7px 0; border-bottom: 1px solid var(--line); display: flex;
+        justify-content: space-between; gap: 10px; }
+  .ev:last-child { border-bottom: 0; }
+  .ev .who { color: var(--muted); font-size: 12.5px; }
+  .live { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+          background: var(--accent); margin-right: 6px; vertical-align: middle; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>FriendMatch — activity matching</h1>
+    <p class="sub">
+      Two paths, deliberately separate. Change a selection and the <b>advisory</b> panel
+      updates with zero LLM calls. Press <b>Submit intent</b> and the <b>authoritative</b>
+      path decides whether to join you to an event or create one.
+    </p>
+  </header>
+
+  <div class="grid">
+    <!-- ---------------- Intent ---------------- -->
+    <div>
+      <div class="panel">
+        <h2>Your intent</h2>
+        <p class="hint">Buttons and known words never reach the model.</p>
+
+        <div id="vocab"></div>
+
+        <label for="text">Free text <span id="textHint"></span></label>
+        <input id="text" placeholder="try: gym &nbsp;·&nbsp; treadmill &nbsp;·&nbsp; work on my robotics project">
+
+        <div class="row">
+          <div>
+            <label for="loc">Location</label>
+            <select id="loc"><option value="">— none —</option></select>
+          </div>
+          <div>
+            <label for="user">Acting as</label>
+            <select id="user">
+              <option>alice</option><option>bob</option><option>carol</option><option>dan</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="go" id="submit">Submit intent →</button>
+          <button class="ghost" id="reset">Reset demo</button>
+        </div>
+        <p class="note" id="pathNote">
+          The advisory panel refreshes as you type or click — it is read-only and
+          cannot create or join anything.
+        </p>
+      </div>
+
+      <div class="panel" style="margin-top:18px">
+        <h2>Open events</h2>
+        <p class="hint">Live repository state.</p>
+        <div id="events"><p class="empty">No events yet — submit an intent.</p></div>
+      </div>
+    </div>
+
+    <!-- ---------------- Results ---------------- -->
+    <div>
+      <div class="panel">
+        <h2><span class="live"></span>Advisory — what could I join?</h2>
+        <p class="hint" id="advHint">Real-time path · read-only · 0 LLM calls</p>
+        <div id="recs"><p class="empty">Pick an activity to see live recommendations.</p></div>
+      </div>
+
+      <div class="panel" style="margin-top:18px">
+        <h2>Authoritative outcome</h2>
+        <p class="hint">Only this path joins or creates. The join is revalidated atomically.</p>
+        <div id="outcome"><p class="empty">Nothing submitted yet.</p></div>
+      </div>
+
+      <div class="panel" style="margin-top:18px">
+        <h2>Metrics</h2>
+        <p class="hint">The ratio is what the whole design optimizes for.</p>
+        <div class="metrics" id="metrics"></div>
+        <p class="note" id="llmNote"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const selected = new Set();
+let synonyms = new Set();
+let threshold = 0.7;
+
+const api = async (path, opts) => {
+  const res = await fetch(path, opts);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error ?? 'Request failed');
+  }
+  return res.json();
+};
+
+const intentBody = () => ({
+  userId: $('user').value,
+  activityIds: [...selected],
+  text: $('text').value,
+  locationIds: $('loc').value ? [$('loc').value] : [],
+});
+
+// ---- vocabulary -----------------------------------------------------------
+async function loadVocabulary() {
+  const v = await api('/api/vocabulary');
+  threshold = v.matchThreshold;
+  synonyms = new Set(v.synonyms);
+  $('vocab').innerHTML = v.categories.map((c) => `
+    <div class="cat">${c.name}</div>
+    <div class="chips">${c.activities.map((a) =>
+      `<button class="chip" type="button" aria-pressed="false" data-id="${a.id}">${a.id}</button>`
+    ).join('')}</div>`).join('');
+
+  $('vocab').addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    const id = chip.dataset.id;
+    if (selected.has(id)) { selected.delete(id); chip.setAttribute('aria-pressed', 'false'); }
+    else { selected.add(id); chip.setAttribute('aria-pressed', 'true'); }
+    refreshAdvisory();
+  });
+
+  $('loc').insertAdjacentHTML('beforeend',
+    v.locations.map((l) => `<option value="${l.id}">${l.name}</option>`).join(''));
+}
+
+// ---- advisory path --------------------------------------------------------
+let pending;
+function refreshAdvisory() {
+  updateTextHint();
+  clearTimeout(pending);
+  pending = setTimeout(runAdvisory, 180);
+}
+
+async function runAdvisory() {
+  const body = intentBody();
+  if (body.activityIds.length === 0 && body.text.trim() === '') {
+    $('recs').innerHTML = '<p class="empty">Pick an activity to see live recommendations.</p>';
+    return;
+  }
+  try {
+    const r = await api('/api/recommend', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+    });
+    $('advHint').textContent =
+      `Real-time path · read-only · 0 LLM calls${r.cacheHit ? ' · served from cache' : ''}`;
+    renderRecs(r.recommendations);
+    renderMetrics(r.metrics);
+  } catch (err) { $('recs').innerHTML = `<p class="empty">${err.message}</p>`; }
+}
+
+function renderRecs(recs) {
+  if (recs.length === 0) {
+    $('recs').innerHTML = '<p class="empty">Nothing joinable right now — submitting would create a new event.</p>';
+    return;
+  }
+  $('recs').innerHTML = recs.map((r) => {
+    const b = r.breakdown;
+    const bar = (k, v) => `<div><div class="bar-label">${k}</div><div class="bar"><i style="width:${Math.round(v*100)}%"></i></div></div>`;
+    const over = r.score >= threshold;
+    return `<div class="rec">
+      <div class="rec-head">
+        <span class="rec-title">${r.event.activityId}</span>
+        <span class="score" style="color:${over ? 'var(--accent)' : 'var(--muted)'}">${r.score.toFixed(3)}</span>
+      </div>
+      <div class="rec-meta">
+        ${r.event.participantCount}/${r.event.capacity} joined ·
+        ${new Date(r.event.startTime).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} ·
+        ${r.event.locationId} ·
+        ${over ? 'above threshold' : `below ${threshold} threshold`}
+      </div>
+      <div class="bars">
+        ${bar('act', b.activity)}${bar('time', b.time)}${bar('loc', b.location)}${bar('tag', b.tag)}${bar('qual', b.quality)}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ---- authoritative path ---------------------------------------------------
+async function submit() {
+  try {
+    const r = await api('/api/match', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(intentBody()),
+    });
+    renderOutcome(r.outcome);
+    renderMetrics(r.metrics);
+    await Promise.all([loadEvents(), runAdvisory()]);
+  } catch (err) {
+    $('outcome').innerHTML = `<div class="outcome rejected"><b>ERROR</b><br>${err.message}</div>`;
+  }
+}
+
+function renderOutcome(o) {
+  const who = $('user').value;
+  if (o.status === 'REJECTED') {
+    $('outcome').innerHTML = `<div class="outcome rejected">
+      <b>REJECTED</b> · <code>${o.reason}</code><br>
+      Nothing resolved to the controlled vocabulary, so there is nothing to match
+      against and nothing meaningful to create. No event was written.</div>`;
+    return;
+  }
+  const verb = o.status === 'MATCHED'
+    ? `joined an existing event at score <b>${o.score.toFixed(3)}</b> (threshold ${threshold})`
+    : 'created a new event — nothing cleared the threshold';
+  $('outcome').innerHTML = `<div class="outcome ${o.status.toLowerCase()}">
+    <b>${o.status}</b> · ${who} ${verb}<br>
+    <span style="color:var(--muted);font-size:13px">
+      ${o.event.activityId} · ${o.event.participantCount}/${o.event.capacity} joined ·
+      ${o.event.locationId} · semantic: <code>${o.semanticSource}</code>
+      ${o.idempotentReplay ? ' · <b>idempotent replay</b>' : ''}
+    </span></div>`;
+}
+
+// ---- events + metrics -----------------------------------------------------
+async function loadEvents() {
+  const { events } = await api('/api/events');
+  $('events').innerHTML = events.length === 0
+    ? '<p class="empty">No events yet — submit an intent.</p>'
+    : events.map((e) => `<div class="ev">
+        <span><b>${e.activityId}</b> <span class="who">· ${e.locationId} · ${e.status}</span></span>
+        <span class="who">${e.participantCount}/${e.capacity} · ${(e.participantIds ?? []).join(', ')}</span>
+      </div>`).join('');
+}
+
+function renderMetrics(m) {
+  $('metrics').innerHTML = `
+    <div class="metric hero"><div class="v">${m.llmCallRatio.toFixed(2)}</div><div class="k">LLM / match</div></div>
+    <div class="metric"><div class="v">${m.llmCalls}</div><div class="k">LLM calls</div></div>
+    <div class="metric"><div class="v">${m.matchRequests}</div><div class="k">match reqs</div></div>
+    <div class="metric"><div class="v">${m.matched}</div><div class="k">matched</div></div>
+    <div class="metric"><div class="v">${m.pending}</div><div class="k">created</div></div>
+    <div class="metric"><div class="v">${m.rejected}</div><div class="k">rejected</div></div>`;
+  $('llmNote').innerHTML = m.llmLive
+    ? 'LLM is <b>live</b>. It is still only reached by genuinely novel free text — buttons, synonyms and repeats stay at zero.'
+    : 'No <code>ANTHROPIC_API_KEY</code> set, so the LLM tier is unavailable — and everything below still works. That is the design, not a limitation.';
+}
+
+function updateTextHint() {
+  const raw = $('text').value.trim().toLowerCase();
+  const hint = $('textHint');
+  if (raw === '') { hint.textContent = ''; return; }
+  const known = synonyms.has(raw) || selected.size > 0;
+  hint.innerHTML = known
+    ? '<span style="color:var(--accent)">— known term, 0 LLM calls</span>'
+    : '<span style="color:var(--muted)">— may need the model on submit</span>';
+}
+
+// ---- boot -----------------------------------------------------------------
+$('submit').addEventListener('click', submit);
+$('text').addEventListener('input', refreshAdvisory);
+$('loc').addEventListener('change', refreshAdvisory);
+$('user').addEventListener('change', runAdvisory);
+$('reset').addEventListener('click', async () => {
+  const r = await api('/api/reset', { method: 'POST' });
+  selected.clear();
+  document.querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', 'false'));
+  $('text').value = '';
+  $('outcome').innerHTML = '<p class="empty">Nothing submitted yet.</p>';
+  renderMetrics(r.metrics);
+  await Promise.all([loadEvents(), runAdvisory()]);
+});
+
+await loadVocabulary();
+await Promise.all([loadEvents(), api('/api/metrics').then(renderMetrics)]);
+</script>
+</body>
+</html>
