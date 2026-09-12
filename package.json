@@ -6,7 +6,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "example": "tsx examples/quickstart.ts"
   },
   "author": "",
   "license": "UNLICENSED",

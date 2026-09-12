@@ -7,6 +7,52 @@ your database, your LLM, your cache, your profile store — is a port you inject
 
 ---
 
+## Quick start
+
+```bash
+npm install
+npm test          # 294 tests
+npm run example   # runnable end-to-end demo, no database or API key needed
+```
+
+`npm run example` runs [`examples/quickstart.ts`](examples/quickstart.ts) and prints:
+
+```
+alice: PENDING -> feb78828-…     # nothing compatible existed, so an event was created
+bob:   MATCHED -> feb78828-…     # "gym" resolved to workout deterministically, joined alice
+       same event as alice: true
+carol sees: 1 joinable event(s)
+       feb78828-…  score=0.855
+
+LLM calls: 0
+LLM calls / match request: 0
+```
+
+### Using it in your app
+
+```ts
+import { createMatchingEngine, createInMemoryEventRepository } from '@friendmatch/algorithm';
+
+const engine = createMatchingEngine({
+  events: createInMemoryEventRepository(), // swap for your real repository
+});
+
+await engine.match('user-123', { activityIds: ['treadmill'] });
+await engine.recommend({ activityIds: ['treadmill'] }, 'user-123');
+```
+
+Only `events` is required; every other port has a working default. To run against a
+real database, implement [`EventRepository`](src/core/types.ts) — see
+[The production `EventRepository` contract](#the-production-eventrepository-contract)
+for the atomic conditional update and the indexes it needs.
+
+> **This is a library, not a service.** It ships no HTTP server, no routes and no UI —
+> deliberately, so it imposes no framework or deployment model on the app around it.
+> Cloning and running it gives you the test suite and the example above; to expose it
+> over HTTP, import it from your own server.
+
+---
+
 ## The design rule
 
 > **Use LLMs to understand ambiguous human intent. Use deterministic code and
